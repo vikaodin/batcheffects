@@ -1,0 +1,880 @@
+Appendix 1. Code: fixed effect, one and two step procedure
+rm(list=ls(all=TRUE))
+seed=201
+set.seed(seed)
+#
+library(MASS)
+library(gee)
+#library(nlme)
+# fiona
+exact=FALSE
+NMZtot=5000
+
+#
+#
+MLmethod='REML'
+r2=.05
+h2m=.6
+h2ag=.5
+nplate=70
+platevar=.25
+selh=.5  # std units of agressie (var=1)
+sell=-.5  # std units
+#
+nrep=50
+#
+#
+#
+Slat=matrix(c(
+1,0,0,0,1,0,0,0, # AM1
+0,1,0,0,0,0,0,0, # EM1
+0,0,1,0,0,0,1,0, # AAg1
+0,0,0,1,0,0,0,0, # EAg1
+1,0,0,0,1,0,0,0, # AM2
+0,0,0,0,0,1,0,0, # EM2
+0,0,1,0,0,0,1,0, # AAg2
+0,0,0,0,0,0,0,1  # EAg2
+),8,8,byrow=T)
+mlat=rep(0,8)
+#
+platesd=sqrt(platevar)
+b=sqrt(r2)
+resv=1-r2
+sdv=sqrt(resv)
+#
+#
+results3a=matrix(0,nrep,5)
+results4a=matrix(0,nrep,5)
+results5a=matrix(0,nrep,5)
+results4b=matrix(0,nrep,5)
+results5b=matrix(0,nrep,5)
+results4a2=matrix(0,nrep,5)
+results5a2=matrix(0,nrep,5)
+results4b2=matrix(0,nrep,5)
+results5b2=matrix(0,nrep,5)
+
+#
+for (irep in 1:nrep) {
+
+#
+d1=mvrnorm(NMZtot,mu=mlat,Sigma=Slat,emp=exact)
+d2=matrix(0,NMZtot,7)
+d2[,1]=d1[,1]*sqrt(h2m) + d1[,2]*sqrt(1-h2m)
+d2[,3]=d1[,5]*sqrt(h2m) + d1[,6]*sqrt(1-h2m)
+res1=(d1[,3]*sqrt(h2ag) + d1[,4]*sqrt(1-h2ag))*sdv
+res2=(d1[,7]*sqrt(h2ag) + d1[,8]*sqrt(1-h2ag))*sdv
+d2[,2]=d2[,1]*b+res1
+d2[,4]=d2[,3]*b+res2
+d2=as.data.frame(d2)
+#                 1      2       3      4    5      6       7
+colnames(d2)=c('mbol1','ag1','mbol2','ag2','sel','eff1','eff2')
+#
+summary(lm(ag1~mbol1,data=d2))
+summary(lm(ag2~mbol2,data=d2))
+#
+sel=(d2$ag1 < d2$ag2) 
+d2[sel,1:5]=d2[sel,c(3,4,1,2,5)]
+#
+#
+#
+filt=matrix(0,NMZtot,3)
+filt[,1]=cch=(d2$ag1>selh& d2$ag2>selh)
+filt[,2]=ccl=(d2$ag1<sell & d2$ag2<sell)
+filt[,3]=disc=((d2$ag1<sell & d2$ag2>selh) | (d2$ag2<sell & d2$ag1>selh)) 
+d2[,5]='no'
+d2[cch,5]='cchi'
+d2[cch,6:7]=1
+d2[ccl,5]='cclo'
+d2[disc,5]='disc'
+d2[disc,6]=1
+#
+d4=d5=d3=d2[d2[,5]!="no",]
+#
+N=dim(d3)[1]
+#
+# assign plates
+#
+nplc=sample(c(1:nplate),N,replace=T)
+npl1=sample(c(1:nplate),N,replace=T)
+npl2=sample(c(1:nplate),N,replace=T)
+platec=rnorm(nplate,0,(platesd))
+plates=rnorm(nplate,0,(platesd))
+if (exact) {
+platec=(platec-mean(platec))/sd(platec)
+plates=(plates-mean(plates))/sd(plates)
+           }
+#
+# shared plate
+d4[,1]=d4[,1]+platec[nplc]
+d4[,3]=d4[,3]+platec[nplc]
+# random assignment
+d5[,1]=d5[,1]+plates[npl1]
+d5[,3]=d5[,3]+plates[npl2]
+#
+#colnames(d2)=c('mbol1','ag1','mbol2','ag2','sel')
+#
+pair=rep(1:N,each=2)
+twin=rep(c(1:2),N)
+d5L=as.data.frame(matrix(0,N*2,7+2))
+d4L=as.data.frame(matrix(0,N*2,7+2))
+d3L=as.data.frame(matrix(0,N*2,7))
+#
+d3L[,1]=d4L[,1]=d5L[,1]=pair  # pair
+d3L[,2]=d4L[,2]=d5L[,2]=twin  # member
+d3L[,7]=d4L[,7]=d5L[,7]=1 # unit
+d3L[,3]=d3[pair,5]
+d4L[,3]=d3[pair,5]
+d5L[,3]=d3[pair,5]
+#
+indi=matrix(c(1,2,3,4),2,2,byrow=T)
+#
+print(' start H->V ')
+ii=0
+for (i in 1:N) {
+for (j in 1:2) {
+ii=ii+1
+# ---------------------------------------------------3 
+d3L[ii,6]=d3[i,5+j]
+d3L[ii,4]=d3[i,indi[j,1]] # mbol1
+d3L[ii,5]=d3[i,indi[j,2]] # agr1
+# ------------------------------------------------- 4
+d4L[ii,6]=d3[i,5+j]
+d4L[ii,4]=d4[i,indi[j,1]] # mbol1
+d4L[ii,5]=d4[i,indi[j,2]] # agr1
+if (j==1) {
+d4L[ii,8]=nplc[i]
+if (d4[i,5]=='disc') {d4L[ii,6]=1}
+}
+if (j==2) {
+d4L[ii,8]=nplc[i]
+}
+# --------------------------------------------------- 5
+d5L[ii,6]=d3[i,5+j]
+d5L[ii,4]=d5[i,indi[j,1]] # mbol1
+d5L[ii,5]=d5[i,indi[j,2]] # agr1
+
+if (j==1) {
+d5L[ii,8]=npl1[i]
+if (d5[i,5]=='disc') {d5L[ii,6]=1}
+}
+if (j==2) {
+d5L[ii,8]=npl2[i]
+}
+#
+}}  # twin pair
+print(' end H->V ')
+#
+
+tagpl=c('plate','mbolc')
+vnames=c('pair','mem','type','mbol','ag','eff','unit')
+colnames(d3L)=vnames
+colnames(d4L)=c(vnames,tagpl)
+colnames(d5L)=c(vnames,tagpl)
+#
+#
+correct4=lm(mbol~as.factor(plate),data=d4L)
+d4L[,9]=correct4$residuals
+correct5=lm(mbol~as.factor(plate),data=d5L)
+d5L[,9]=correct5$residuals
+
+r3a=gee(mbol~eff,id=pair,corstr='exchangeable',data=d3L)
+r4a=gee(mbolc~eff,id=pair,corstr='exchangeable',data=d4L)
+r5a=gee(mbolc~eff,id=pair,corstr='exchangeable',data=d5L)
+
+r4a2=gee(mbol~eff+as.factor(plate),id=pair,corstr='exchangeable',data=d4L)
+r5a2=gee(mbol~eff+as.factor(plate),id=pair,corstr='exchangeable',data=d5L)
+
+r3b=gee(mbol~ag,id=pair,corstr='exchangeable',data=d3L)
+r4b=gee(mbolc~ag,id=pair,corstr='exchangeable',data=d4L)
+r5b=gee(mbolc~ag,id=pair,corstr='exchangeable',data=d5L)
+
+r4b2=gee(mbol~ag+as.factor(plate),id=pair,corstr='exchangeable',data=d4L)
+r5b2=gee(mbol~ag+as.factor(plate),id=pair,corstr='exchangeable',data=d5L)
+
+results3a[irep,1:5]=as.numeric(summary(r3a)$coefficients[2,])
+results4a[irep,1:5]=as.numeric(summary(r4a)$coefficients[2,])
+results5a[irep,1:5]=as.numeric(summary(r5a)$coefficients[2,])
+results4a2[irep,1:5]=as.numeric(summary(r4a2)$coefficients[2,])
+results5a2[irep,1:5]=as.numeric(summary(r5a2)$coefficients[2,])
+results4b[irep,1:5]=as.numeric(summary(r4b)$coefficients[2,])
+results5b[irep,1:5]=as.numeric(summary(r5b)$coefficients[2,])
+results4b2[irep,1:5]=as.numeric(summary(r4b2)$coefficients[2,])
+results5b2[irep,1:5]=as.numeric(summary(r5b2)$coefficients[2,])
+
+}
+mrep=nrep
+
+round(apply(results3a[1:mrep,c(1,4,5)],2,mean),3) # eff=0/1 random allo of pairs
+
+round(apply(results4a[1:mrep,c(1,4,5)],2,mean),3) # eff=0/1 random allo of pairs
+round(apply(results4a[1:mrep,c(1,4,5)],2,sd),3) # eff=0/1 random allo of pairs
+
+round(apply(results5a[1:mrep,c(1,4,5)],2,mean),3) # eff=0/1 random allo of individuals
+round(apply(results5a[1:mrep,c(1,4,5)],2,sd),3) # eff=0/1 random allo of individuals
+
+round(apply(results4b[1:mrep,c(1,4,5)],2,mean),3) # eff=ag
+round(apply(results4b[1:mrep,c(1,4,5)],2,sd),3) # eff=ag
+
+round(apply(results5b[1:mrep,c(1,4,5)],2,mean),3) # eff=ag
+round(apply(results5b[1:mrep,c(1,4,5)],2,sd),3) # eff=ag
+
+round(apply(results4a2[1:mrep,c(1,4,5)],2,mean),3) # eff=0/1 random allo of pairs
+round(apply(results4a2[1:mrep,c(1,4,5)],2,sd),3) # eff=0/1 random allo of pairs
+
+round(apply(results5a2[1:mrep,c(1,4,5)],2,mean),3) # eff=0/1 random allo of individuals
+round(apply(results5a2[1:mrep,c(1,4,5)],2,sd),3) # eff=0/1 random allo of individuals
+
+round(apply(results4b2[1:mrep,c(1,4,5)],2,mean),3) # eff=ag
+round(apply(results4b2[1:mrep,c(1,4,5)],2,sd),3) # eff=ag
+
+round(apply(results5b2[1:mrep,c(1,4,5)],2,mean),3) # eff=ag
+round(apply(results5b2[1:mrep,c(1,4,5)],2,sd),3) # eff=ag
+
+
+
+
+Appendix 2. Code: random effects model
+
+rm(list=ls(all=TRUE))
+seed=301
+set.seed(seed)
+#
+library(MASS)
+#library(gee)
+library(nlme)
+# fiona
+exact=FALSE
+NMZtot=1000
+
+#
+#
+MLmethod='REML'
+r2=.05
+h2m=.6
+h2ag=.5
+nplate=70
+platevar=.25
+selh=.25  # std units of agressie (var=1)
+sell=-.25  # std units
+#
+nrep=100
+#
+#
+#
+Slat=matrix(c(
+1,0,0,0,1,0,0,0, # AM1
+0,1,0,0,0,0,0,0, # EM1
+0,0,1,0,0,0,1,0, # AAg1
+0,0,0,1,0,0,0,0, # EAg1
+1,0,0,0,1,0,0,0, # AM2
+0,0,0,0,0,1,0,0, # EM2
+0,0,1,0,0,0,1,0, # AAg2
+0,0,0,0,0,0,0,1  # EAg2
+),8,8,byrow=T)
+mlat=rep(0,8)
+#
+platesd=sqrt(platevar)
+b=sqrt(r2)
+resv=1-r2
+sdv=sqrt(resv)
+#
+#
+results4a=matrix(0,nrep,8)
+results5a=matrix(0,nrep,8)
+results4b=matrix(0,nrep,8)
+results5b=matrix(0,nrep,8)
+#
+for (irep in 1:nrep) {
+
+#
+d1=mvrnorm(NMZtot,mu=mlat,Sigma=Slat,emp=exact)
+d2=matrix(0,NMZtot,7)
+d2[,1]=d1[,1]*sqrt(h2m) + d1[,2]*sqrt(1-h2m)
+d2[,3]=d1[,5]*sqrt(h2m) + d1[,6]*sqrt(1-h2m)
+res1=(d1[,3]*sqrt(h2ag) + d1[,4]*sqrt(1-h2ag))*sdv
+res2=(d1[,7]*sqrt(h2ag) + d1[,8]*sqrt(1-h2ag))*sdv
+d2[,2]=d2[,1]*b+res1
+d2[,4]=d2[,3]*b+res2
+d2=as.data.frame(d2)
+#                 1      2       3      4    5      6       7
+colnames(d2)=c('mbol1','ag1','mbol2','ag2','sel','eff1','eff2')
+#
+summary(lm(ag1~mbol1,data=d2))
+summary(lm(ag2~mbol2,data=d2))
+#
+sel=(d2$ag1 < d2$ag2) 
+d2[sel,1:5]=d2[sel,c(3,4,1,2,5)]
+#
+#
+#
+filt=matrix(0,NMZtot,3)
+filt[,1]=cch=(d2$ag1>selh& d2$ag2>selh)
+filt[,2]=ccl=(d2$ag1<sell & d2$ag2<sell)
+filt[,3]=disc=((d2$ag1<sell & d2$ag2>selh) | (d2$ag2<sell & d2$ag1>selh)) 
+d2[,5]='no'
+d2[cch,5]='cchi'
+d2[cch,6:7]=1
+d2[ccl,5]='cclo'
+d2[disc,5]='disc'
+d2[disc,6]=1
+#
+d4=d5=d3=d2[d2[,5]!="no",]
+#
+N=dim(d3)[1]
+#
+# assign plates
+#
+nplc=sample(c(1:nplate),N,replace=T)
+npl1=sample(c(1:nplate),N,replace=T)
+npl2=sample(c(1:nplate),N,replace=T)
+platec=rnorm(nplate,0,(platesd))
+plates=rnorm(nplate,0,(platesd))
+if (exact) {
+platec=(platec-mean(platec))/sd(platec)
+plates=(plates-mean(plates))/sd(plates)
+           }
+#
+# shared plate
+d4[,1]=d4[,1]+platec[nplc]
+d4[,3]=d4[,3]+platec[nplc]
+# random assignment
+d5[,1]=d5[,1]+plates[npl1]
+d5[,3]=d5[,3]+plates[npl2]
+#
+#colnames(d2)=c('mbol1','ag1','mbol2','ag2','sel')
+#
+pair=rep(1:N,each=2)
+twin=rep(c(1:2),N)
+d5L=as.data.frame(matrix(0,N*2,7+nplate))
+d4L=as.data.frame(matrix(0,N*2,7+nplate))
+d3L=as.data.frame(matrix(0,N*2,7))
+d3L[,1]=d4L[,1]=d5L[,1]=pair  # pair
+d3L[,2]=d4L[,2]=d5L[,2]=twin  # member
+d3L[,7]=d4L[,7]=d5L[,7]=1 # unit
+d3L[,3]=d3[pair,5]
+d4L[,3]=d3[pair,5]
+d5L[,3]=d3[pair,5]
+#
+indi=matrix(c(1,2,3,4),2,2,byrow=T)
+#
+print(' start H->V ')
+ii=0
+for (i in 1:N) {
+for (j in 1:2) {
+ii=ii+1
+# ---------------------------------------------------3 
+d3L[ii,6]=d3[i,5+j]
+d3L[ii,4]=d3[i,indi[j,1]] # mbol1
+d3L[ii,5]=d3[i,indi[j,2]] # agr1
+# ------------------------------------------------- 4
+d4L[ii,6]=d3[i,5+j]
+d4L[ii,4]=d4[i,indi[j,1]] # mbol1
+d4L[ii,5]=d4[i,indi[j,2]] # agr1
+if (j==1) {
+plate=rep(0,nplate)
+plate[nplc[i]]=1
+d4L[ii,8:(7+nplate)]=plate
+if (d4[i,5]=='disc') {d4L[ii,6]=1}
+}
+if (j==2) {
+plate=rep(0,nplate)
+plate[nplc[i]]=1
+d4L[ii,8:(7+nplate)]=plate
+}
+# --------------------------------------------------- 5
+d5L[ii,6]=d3[i,5+j]
+d5L[ii,4]=d5[i,indi[j,1]] # mbol1
+d5L[ii,5]=d5[i,indi[j,2]] # agr1
+
+if (j==1) {
+plate=rep(0,nplate)
+plate[npl1[i]]=1
+d5L[ii,8:(7+nplate)]=plate
+if (d5[i,5]=='disc') {d5L[ii,6]=1}
+}
+if (j==2) {
+plate=rep(0,nplate)
+plate[npl2[i]]=1
+d5L[ii,8:(7+nplate)]=plate
+}
+#
+}}  # twin pair
+print(' end H->V ')
+
+tagpl=paste('pl',1:nplate,sep="")
+vnames=c('pair','mem','type','mbol','ag','eff','unit')
+colnames(d3L)=vnames
+colnames(d4L)=c(vnames,tagpl)
+colnames(d5L)=c(vnames,tagpl)
+#
+#
+
+control=lmeControl(maxIter = 5000, msMaxIter = 5000, tolerance = 1e-5, niterEM = 2500,
+msMaxEval = 5000,
+	msTol = 1e-6)
+
+
+# r3=lme(mbol~1+ag,random=~1|pair,control=control,data=d3L)
+#
+r4a=lme(mbol~1+eff, 
+random=list(
+unit=(pdIdent(~pl1+pl2+pl3+pl4+pl5+pl6+pl7+pl8+pl9+pl10+
+pl11+pl12+pl13+pl14+pl15+pl16+pl17+pl18+pl19+pl20+
+pl21+pl22+pl23+pl24+pl25+pl26+pl27+pl28+pl29+pl30+
+pl31+pl32+pl33+pl34+pl35+pl36+pl37+pl38+pl39+pl40+
+pl41+pl42+pl43+pl44+pl45+pl46+pl47+pl48+pl49+pl50+
+pl51+pl52+pl53+pl54+pl55+pl56+pl57+pl58+pl59+pl60+
+pl61+pl62+pl63+pl64+pl65+pl66+pl67+pl68+pl69+pl70-1)),
+pair=(pdDiag(~unit-1))),
+control=control,data=d4L,method=MLmethod)
+
+r5a=lme(mbol~1+eff, 
+random=list(
+unit=(pdIdent(~pl1+pl2+pl3+pl4+pl5+pl6+pl7+pl8+pl9+pl10+
+pl11+pl12+pl13+pl14+pl15+pl16+pl17+pl18+pl19+pl20+
+pl21+pl22+pl23+pl24+pl25+pl26+pl27+pl28+pl29+pl30+
+pl31+pl32+pl33+pl34+pl35+pl36+pl37+pl38+pl39+pl40+
+pl41+pl42+pl43+pl44+pl45+pl46+pl47+pl48+pl49+pl50+
+pl51+pl52+pl53+pl54+pl55+pl56+pl57+pl58+pl59+pl60+
+pl61+pl62+pl63+pl64+pl65+pl66+pl67+pl68+pl69+pl70-1)),
+pair=(pdDiag(~unit-1))),
+control=control,data=d5L,method=MLmethod)
+#
+r4b=lme(mbol~1+ag, 
+random=list(
+unit=(pdIdent(~pl1+pl2+pl3+pl4+pl5+pl6+pl7+pl8+pl9+pl10+
+pl11+pl12+pl13+pl14+pl15+pl16+pl17+pl18+pl19+pl20+
+pl21+pl22+pl23+pl24+pl25+pl26+pl27+pl28+pl29+pl30+
+pl31+pl32+pl33+pl34+pl35+pl36+pl37+pl38+pl39+pl40+
+pl41+pl42+pl43+pl44+pl45+pl46+pl47+pl48+pl49+pl50+
+pl51+pl52+pl53+pl54+pl55+pl56+pl57+pl58+pl59+pl60+
+pl61+pl62+pl63+pl64+pl65+pl66+pl67+pl68+pl69+pl70-1)),
+pair=(pdDiag(~unit-1))),
+control=control,data=d4L,method=MLmethod)
+#
+r5b=lme(mbol~1+ag, 
+random=list(
+unit=(pdIdent(~pl1+pl2+pl3+pl4+pl5+pl6+pl7+pl8+pl9+pl10+
+pl11+pl12+pl13+pl14+pl15+pl16+pl17+pl18+pl19+pl20+
+pl21+pl22+pl23+pl24+pl25+pl26+pl27+pl28+pl29+pl30+
+pl31+pl32+pl33+pl34+pl35+pl36+pl37+pl38+pl39+pl40+
+pl41+pl42+pl43+pl44+pl45+pl46+pl47+pl48+pl49+pl50+
+pl51+pl52+pl53+pl54+pl55+pl56+pl57+pl58+pl59+pl60+
+pl61+pl62+pl63+pl64+pl65+pl66+pl67+pl68+pl69+pl70-1)),
+pair=(pdDiag(~unit-1))),
+control=control,data=d5L,method=MLmethod)
+#
+par_fixed5a=summary(r5a)$tTable
+par_sd5a=exp(as.numeric(attr(r5a$apVar,"Pars")))
+par_var5a=par_sd5a^2
+#
+par_fixed5b=summary(r5b)$tTable
+par_sd5b=exp(as.numeric(attr(r5b$apVar,"Pars")))
+par_var5b=par_sd5b^2
+#
+par_fixed4a=summary(r4a)$tTable
+par_sd4a=exp(as.numeric(attr(r4a$apVar,"Pars")))
+par_var4a=par_sd4a^2
+#
+par_fixed4b=summary(r4b)$tTable
+par_sd4b=exp(as.numeric(attr(r4b$apVar,"Pars")))
+par_var4b=par_sd4b^2
+#
+results4a[irep,1:5]=par_fixed4a[2,]
+results4a[irep,6:8]=par_var4a
+results4b[irep,1:5]=par_fixed4b[2,]
+results4b[irep,6:8]=par_var4b
+#
+results5a[irep,1:5]=par_fixed5a[2,]
+results5a[irep,6:8]=par_var5a
+results5b[irep,1:5]=par_fixed5b[2,]
+results5b[irep,6:8]=par_var5b
+
+print(c(irep,nrep))
+print(par_fixed4a)
+print(par_var4a)
+
+}
+mrep=50
+round(apply(results4a[1:mrep,c(1,2,4,6,7,8)],2,mean),3) # eff=0/1 random allo of pairs
+round(apply(results4a[1:mrep,c(1,2,4,6,7,8)],2,sd),3) # eff=0/1 random allo of pairs
+
+round(apply(results5a[1:mrep,c(1,2,4,6,7,8)],2,mean),3) # eff=0/1 random allo of individuals
+round(apply(results5a[1:mrep,c(1,2,4,6,7,8)],2,sd),3) # eff=0/1 random allo of individuals
+
+round(apply(results4b[1:mrep,c(1,2,4,6,7,8)],2,mean),3) # eff=ag
+round(apply(results4b[1:mrep,c(1,2,4,6,7,8)],2,sd),3) # eff=ag
+
+round(apply(results5b[1:mrep,c(1,2,4,6,7,8)],2,mean),3) # eff=ag
+round(apply(results5b[1:mrep,c(1,2,4,6,7,8)],2,sd),3) # eff=ag
+
+
+Appendix 3. Code: ACE model no batch effect and no batch effects modeled.
+
+rm(list=ls(all=TRUE))
+#
+# random batch
+#
+library(MASS)
+library(nlme)
+#
+control=lmeControl(maxIter = 5000, msMaxIter = 5000, tolerance = 1e-5, niterEM = 2500,
+msMaxEval = 5000,
+	msTol = 1e-6)
+#
+MLmethod='REML'
+exact=F
+sharedB=F
+#
+Nmz=Ndz=120
+Smz=matrix(c(
+10,6,6,10),2,2)
+Sdz=matrix(c(
+10,4,4,10),2,2)
+nbatch=40
+vbatch=0
+nrep=250
+#
+results=matrix(NA,nrep,13)
+colnames(results)=c(
+'rvb','rva','rvc','rve','fva','fvc','fve',
+      'crva','crvc','crve','cfva','cfvc','cfve')
+batch=c(1:nbatch)
+wr=F
+#
+for (irep in 1:nrep) {
+print(irep)
+#
+b_eff=scale(rnorm(nbatch,0,1))*sqrt(vbatch)
+#
+bmz1=sample(batch,Nmz,replace=T)
+bdz1=sample(batch,Ndz,replace=T)
+bmz2=sample(batch,Nmz,replace=T)
+bdz2=sample(batch,Ndz,replace=T)
+
+if (sharedB) { 
+bmz2=bmz1
+bdz2=bdz1
+}
+
+#
+dmz=matrix(0,Nmz,7)
+dmz[,1]=1
+
+dmz[,2:3]=mvrnorm(Nmz,rep(0,2),Sigma=Smz,emp=exact)
+dmz[,4]=bmz1
+dmz[,5]=bmz2
+dmz[,2]=dmz[,2]+b_eff[bmz1]
+dmz[,3]=dmz[,3]+b_eff[bmz2]
+#
+
+
+ddz=matrix(0,Ndz,7)
+ddz[,1]=2
+
+ddz[,2:3]=mvrnorm(Ndz,rep(0,2),Sigma=Sdz,emp=exact)
+ddz[,4]=bdz1
+ddz[,5]=bdz2
+ddz[,2]=ddz[,2]+b_eff[bdz1]
+ddz[,3]=ddz[,3]+b_eff[bdz2]
+#
+keepdmz=dmz[,2:3]
+keepddz=ddz[,2:3]
+#
+ddz1=matrix(0,Nmz*2,11)
+dmz1=matrix(0,Nmz*2,11)
+#
+ii=0
+for (i in 1:Nmz) {
+for (j in 1:2) {
+ii=ii+1
+dmz1[ii,1]=i
+dmz1[ii,2]=j
+dmz1[ii,3]=1
+dmz1[ii,4]=dmz[i,(1+j)]
+dmz1[ii,5]=dmz[i,(3+j)]
+dmz1[ii,6]=sqrt(.5)
+dmz1[ii,7]=sqrt(.5)
+dmz1[ii,9]=sqrt(.25)
+dmz1[ii,10]=sqrt(.75)
+}}
+#
+ii=0
+for (i in 1:Ndz) {
+for (j in 1:2) {
+ii=ii+1
+ddz1[ii,1]=i+Nmz
+ddz1[ii,2]=j
+ddz1[ii,3]=2
+ddz1[ii,4]=ddz[i,(1+j)]
+ddz1[ii,5]=ddz[i,(3+j)]
+ddz1[ii,6]=sqrt(.5)
+if (j==1) ddz1[ii,7]=sqrt(.5)
+if (j==2) ddz1[ii,8]=sqrt(.5)
+ddz1[ii,9]=sqrt(.25)
+if (j==1) ddz1[ii,10]=sqrt(.75)
+if (j==2) ddz1[ii,11]=sqrt(.75)
+}}
+#
+twdat=rbind(dmz1,ddz1)
+twdat=cbind(twdat,rep(1,(Nmz+Ndz)*2))
+#
+colnames(twdat)=c('famnr','twnr','zyg','ph','batch','Ac','A1','A2','Dc','D1','D2','unit')
+twdat=as.data.frame(twdat)
+twdat$batch=as.factor(twdat$batch)
+#
+if (wr) write.table(twdat,file='twdat',row.names=F)
+#
+testf=tryCatch(lme(ph~1,
+random=list(
+famnr=pdIdent(~Ac+A1+A2-1),
+famnr=pdIdent(~unit-1)
+),control=control,data=twdat,method=MLmethod), error = function(e) {-999} )
+#
+contf=!is.numeric(testf)
+if (contf) {
+nrf=dim(VarCorr(testf))[1]
+vcompf=na.omit(matrix(as.numeric((VarCorr(testf))),nrf,2,byrow=F))[c(1,4,5),1]
+results[irep,1:3]=vcompf
+           }#
+#
+} # irep
+
+Appendix 4. Code: ACE model with batch effects: random effects model, fixed effects model, one and two step procedures. 
+rm(list=ls(all=TRUE))
+#
+# random batch
+#
+library(MASS)
+library(nlme)
+#
+control=lmeControl(maxIter = 5000, msMaxIter = 5000, tolerance = 1e-5, niterEM = 2500,
+msMaxEval = 5000,
+	msTol = 1e-6)
+#
+MLmethod='REML'
+exact=F
+sharedB=T
+#
+Nmz=Ndz=200
+Smz=matrix(c(
+10,6,6,10),2,2)
+Sdz=matrix(c(
+10,4,4,10),2,2)
+nbatch=25
+vbatch=1
+nrep=250
+#
+results=matrix(NA,nrep,13)
+colnames(results)=c(
+'rvb','rva','rvc','rve','fva','fvc','fve',
+      'crva','crvc','crve','cfva','cfvc','cfve')
+batch=c(1:nbatch)
+wr=F
+#
+for (irep in 1:nrep) {
+print(irep)
+#
+b_eff=scale(rnorm(nbatch,0,1))*sqrt(vbatch)
+#
+bmz1=sample(batch,Nmz,replace=T)
+bdz1=sample(batch,Ndz,replace=T)
+bmz2=sample(batch,Nmz,replace=T)
+bdz2=sample(batch,Ndz,replace=T)
+
+if (sharedB) { 
+bmz2=bmz1
+bdz2=bdz1
+}
+
+#
+dmz=matrix(0,Nmz,7)
+dmz[,1]=1
+
+dmz[,2:3]=mvrnorm(Nmz,rep(0,2),Sigma=Smz,emp=exact)
+dmz[,4]=bmz1
+dmz[,5]=bmz2
+dmz[,2]=dmz[,2]+b_eff[bmz1]
+dmz[,3]=dmz[,3]+b_eff[bmz2]
+#
+
+
+ddz=matrix(0,Ndz,7)
+ddz[,1]=2
+
+ddz[,2:3]=mvrnorm(Ndz,rep(0,2),Sigma=Sdz,emp=exact)
+ddz[,4]=bdz1
+ddz[,5]=bdz2
+ddz[,2]=ddz[,2]+b_eff[bdz1]
+ddz[,3]=ddz[,3]+b_eff[bdz2]
+#
+keepdmz=dmz[,2:3]
+keepddz=ddz[,2:3]
+#
+ddz1=matrix(0,Nmz*2,11)
+dmz1=matrix(0,Nmz*2,11)
+#
+ii=0
+for (i in 1:Nmz) {
+for (j in 1:2) {
+ii=ii+1
+dmz1[ii,1]=i
+dmz1[ii,2]=j
+dmz1[ii,3]=1
+dmz1[ii,4]=dmz[i,(1+j)]
+dmz1[ii,5]=dmz[i,(3+j)]
+dmz1[ii,6]=sqrt(.5)
+dmz1[ii,7]=sqrt(.5)
+dmz1[ii,9]=sqrt(.25)
+dmz1[ii,10]=sqrt(.75)
+}}
+#
+ii=0
+for (i in 1:Ndz) {
+for (j in 1:2) {
+ii=ii+1
+ddz1[ii,1]=i+Nmz
+ddz1[ii,2]=j
+ddz1[ii,3]=2
+ddz1[ii,4]=ddz[i,(1+j)]
+ddz1[ii,5]=ddz[i,(3+j)]
+ddz1[ii,6]=sqrt(.5)
+if (j==1) ddz1[ii,7]=sqrt(.5)
+if (j==2) ddz1[ii,8]=sqrt(.5)
+ddz1[ii,9]=sqrt(.25)
+if (j==1) ddz1[ii,10]=sqrt(.75)
+if (j==2) ddz1[ii,11]=sqrt(.75)
+}}
+#
+twdat=rbind(dmz1,ddz1)
+twdat=cbind(twdat,rep(1,(Nmz+Ndz)*2))
+#
+colnames(twdat)=c('famnr','twnr','zyg','ph','batch','Ac','A1','A2','Dc','D1','D2','unit')
+twdat=as.data.frame(twdat)
+twdat$batch=as.factor(twdat$batch)
+#
+if (wr) write.table(twdat,file='twdat',row.names=F)
+#
+testr=tryCatch(lme(ph~1,
+random=list(
+unit=pdIdent(~batch-1),
+famnr=pdIdent(~Ac+A1+A2-1),
+famnr=pdIdent(~unit-1)
+),control=control,data=twdat,method=MLmethod), error = function(e) {-999})
+#
+testf=tryCatch(lme(ph~1+batch,
+random=list(
+famnr=pdIdent(~Ac+A1+A2-1),
+famnr=pdIdent(~unit-1)
+),control=control,data=twdat,method=MLmethod), error = function(e) {-999} )
+#
+contr=!is.numeric(testr)
+contf=!is.numeric(testf)
+if (contr) {
+nrr=dim(VarCorr(testr))[1]
+vcompr=na.omit(matrix(as.numeric((VarCorr(testr))),nrr,2,byrow=F))[c(nbatch,(nbatch+1),(nbatch+4),(nbatch+5)),1]
+results[irep,1:4]=vcompr
+                        }
+if (contf) {
+nrf=dim(VarCorr(testf))[1]
+vcompf=na.omit(matrix(as.numeric((VarCorr(testf))),nrf,2,byrow=F))[c(1,4,5),1]
+results[irep,5:7]=vcompf
+                        }
+#
+if (contr) {  
+b_eff_r=testr$coefficients$random$unit
+b_eff_r=as.numeric(b_eff_r) 
+           }
+if (contf) {  
+b_eff_f=testf$coefficients$fixed
+b_eff_f[2:nbatch]=b_eff_f[2:nbatch]+b_eff_f[1]
+b_eff_f=as.numeric(b_eff_f)  
+            }
+#
+# plot(beff_r,beff_f)
+#
+if (contf) {
+dmz[,2]=keepdmz[,1]-b_eff_f[bmz1]
+dmz[,3]=keepdmz[,2]-b_eff_f[bmz2]
+ddz[,2]=keepddz[,1]-b_eff_f[bdz1]
+ddz[,3]=keepddz[,2]-b_eff_f[bdz2]
+#
+ii=0
+for (i in 1:Nmz) {
+for (j in 1:2) {
+ii=ii+1
+dmz1[ii,4]=dmz[i,(1+j)]
+}}
+#
+ii=0
+for (i in 1:Ndz) {
+for (j in 1:2) {
+ii=ii+1
+ddz1[ii,4]=ddz[i,(1+j)]
+}}
+
+twdat=rbind(dmz1,ddz1)
+twdat=cbind(twdat,rep(1,(Nmz+Ndz)*2))
+#
+colnames(twdat)=c('famnr','twnr','zyg','ph','batch','Ac','A1','A2','Dc','D1','D2','unit')
+twdat=as.data.frame(twdat)
+twdat$batch=as.factor(twdat$batch)
+#
+ctestf=tryCatch(lme(ph~1,
+random=list(
+famnr=pdIdent(~Ac+A1+A2-1),
+famnr=pdIdent(~unit-1)
+),control=control,data=twdat,method=MLmethod), error = function(e) {-999} 
+)
+} # end if
+#
+if (contr) {
+dmz[,2]=keepdmz[,1]-b_eff_r[bmz1]
+dmz[,3]=keepdmz[,2]-b_eff_r[bmz2]
+ddz[,2]=keepddz[,1]-b_eff_r[bdz1]
+ddz[,3]=keepddz[,2]-b_eff_r[bdz2]
+#
+ii=0
+for (i in 1:Nmz) {
+for (j in 1:2) {
+ii=ii+1
+dmz1[ii,4]=dmz[i,(1+j)]
+}}
+#
+ii=0
+for (i in 1:Ndz) {
+for (j in 1:2) {
+ii=ii+1
+ddz1[ii,4]=ddz[i,(1+j)]
+}}
+#
+twdat=rbind(dmz1,ddz1)
+twdat=cbind(twdat,rep(1,(Nmz+Ndz)*2))
+#
+colnames(twdat)=c('famnr','twnr','zyg','ph','batch','Ac','A1','A2','Dc','D1','D2','unit')
+twdat=as.data.frame(twdat)
+twdat$batch=as.factor(twdat$batch)
+#
+ctestr=tryCatch(lme(ph~1,
+random=list(
+famnr=pdIdent(~Ac+A1+A2-1),
+famnr=pdIdent(~unit-1)
+),control=control,data=twdat,method=MLmethod), error = function(e) {-999} )
+} # end if
+#
+ccontr=!is.numeric(ctestr)
+ccontf=!is.numeric(ctestf)
+#
+if (ccontr) {
+nrr=dim(VarCorr(ctestr))[1]
+cvcompr=na.omit(matrix(as.numeric((VarCorr(ctestr))),nrr,2,byrow=F))[c(1,4,5),1]
+results[irep,8:10]=cvcompr
+            }
+if (ccontf) {
+nrf=dim(VarCorr(ctestf))[1]
+cvcompf=na.omit(matrix(as.numeric((VarCorr(ctestf))),nrf,2,byrow=F))[c(1,4,5),1]
+results[irep,11:13]=cvcompf
+             }
+#
+#
+} # irep
