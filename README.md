@@ -20,10 +20,13 @@ We make the following assumptions concerning the analysis. We assume that the tw
 1) Linear mixed model, in which effect of batch is accommodated by means of a random effect (variance component). 
 2) Fixed regression model with metabolite corrected for batch in one or two step procedure. Two step procedure: regress metabolite on plate first, use residuals in regression on predictor. One step procedure: regress metabolite on plate and on predictor at the same time.
 The association between metabolite and aggression is accommodated by means of a fixed effect, i.e., regression of metabolite on binary (0/1) or continuous aggression score.
-1. Random effects model. Conclusion: 
+
+Simulation 1. Random effects model. 
+The metabolite explains 5% (r2=.05) of the variance in aggression. The heritability of metabolite is .6 (h2m=.5), the heritability of the residual of aggression is .5 (h2ag=.5). The number of batches is 70, the number of twin pairs is 600 (NMZtot=600). The true phenotypic variances of metabolite and aggression are both set to equal 1 and the variance is .25 (platevar=.25). All variables have zero mean. So the metabolite variance is 1.25. The selection is based on a mean split (high aggr>0; low aggr<0). The number of replications is 50.  All 600 pairs are in the analysis. Estimation method is by restricted ML (REML).
+Conclusion: 
 Allocation regime (pairs vs. individuals) has no effect on the estimate of the parameter of interest. We note that, as expected, regression on continuous predictors confers more power than regression on binary predictor (0/1). The variance components (Additive genetic, Environment and Batch) appear to be slightly downwards biased in the allocation by pair, but accurate in the allocation by individual condition. 
 
-Simulation 2: fixed batch effects in two steps or one step.
+Simulation 2. Fixed batch effects in two steps or one step.
 It may be expedient to carry out analyses in two steps, i.e., first correct for batch effects, and second carry out the analysis of actual interest. We compared one and two step analyses in simulation 2.  We used linear mixed modeling in simulation 1 (estimating the twin covariance conditional on predictor and batch). Here we use GEE (generalized estimating equations), i.e., we correct the standard errors after the analyses using a sandwich correction. That is:
 One step: using GEE regress metabolite on predictor and batch simultaneously. 
 Two step: first correct metabolite for batch effect and then use GEE to analyze the residuals.
@@ -35,13 +38,15 @@ This simulation is the same as simulation 2. However here we employ a more extre
 Conclusions:
 The conclusions are consistent with those of simulations 1 and 2.  The allocation regime, i.e., pairs vs. individuals, has little effect on the test of the parameter of interest. The regression of continuous predictors confers more power that regression on binary predictor (0/1), as expected.. There is little difference between the results of the one and two step procedure.
 
+
 How to allocate twins to batches in assay of metabolites in the classical twin design   
+
 Simulation 4: estimating genetic and non-genetic variance components in the twin design.
 In simulation 1, we noted that batch allocation by twin pair appeared to result in a slight bias in the estimates of the variance components. In simulation 4, we examined the effect on variance components by fitting an ACE model to twin data. Here we treat batch as a random and as a fixed effect, and we carry out both one step and two step analyses. We consider relatively small sample sizes. We use linear mixed modeling with REML (restricted maximum likelihood) estimation. 
 Conclusion:
 The results demonstrate that allocation regime has little effect in the one step analyses, regardless of whether this is based on random effects or fixed effects modeling of batch. In the two step procedures, we note a downward bias in the estimates of the A (additive genetic) and C (common environment) variance components. This bias is greater in given the allocation by twin pairs, and greater as the number of batches increases (compare 15, 25, and 40 batch conditions). 
 
-For details of the simulations and R and Settings in the R code see:
+For details of the simulations and Settings in the R code see:
 https://www.cambridge.org/core/journals/twin-research-and-human-genetics/article/establishing-a-twin-register-an-invaluable-resource-for-behavior-genetic-epidemiological-biomarker-and-omics-studies/A027C91A8B3EEBE4DE6AA5ADE49B2DA7#supplementary-materials
 
 Reference
