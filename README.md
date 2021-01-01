@@ -1,5 +1,13 @@
 # batcheffects
-A question that is specific to the twin design (or indeed any other design with naturally clustered observations) concerns the manner of allocation of twins to batches. One may allocate randomly by individual twin, or randomly by twin pair. The latter implies that the twin pairs share the batch, the former does not rule out batch sharing. The following are the results of simulation studies carried out to answer this question in three situations. Simulation 1. Random effects model. Simulation 2: fixed batch effects in two steps or one step. Simulation 3: More extreme selection and fixed plate effects in two step or one step. Reference: Odintsova VV, Willemsen G, Dolan CV, Hottenga JJ, Martin NG, Slagboom PE, Ordoñana JR, Boomsma DI. Establishing a Twin Register: An Invaluable Resource for (Behavior) Genetic, Epidemiological, Biomarker, and 'Omics' Studies. Twin Res Hum Genet. 2018 Jun;21(3):239-252. 
+A question that is specific to the twin design (or indeed any other design with naturally clustered observations) concerns the manner of allocation of twins to batches. One may allocate randomly by individual twin, or randomly by twin pair. The latter implies that the twin pairs share the batch, the former does not rule out batch sharing. The following are the results of simulation studies carried out to answer this question in three situations. 
+
+Simulation 1. Random effects model. 
+
+Simulation 2: Fixed batch effects in two steps or one step. 
+
+Simulation 3: More extreme selection and fixed plate effects in two step or one step. 
+
+Reference: Odintsova VV, Willemsen G, Dolan CV, Hottenga JJ, Martin NG, Slagboom PE, Ordoñana JR, Boomsma DI. Establishing a Twin Register: An Invaluable Resource for (Behavior) Genetic, Epidemiological, Biomarker, and 'Omics' Studies. Twin Res Hum Genet. 2018 Jun;21(3):239-252. 
 
 
 How to allocate twins to batch in assay of metabolites in an extremely discordant and concordant (EDAC) twin design?
